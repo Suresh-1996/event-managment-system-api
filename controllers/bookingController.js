@@ -2,33 +2,28 @@ const Event = require("../models/Event");
 const Booking = require("../models/Booking");
 
 // 📌 Book an Event
+//
+
 exports.bookEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
     const userId = req.user.id;
 
-    console.log(eventId, userId);
-
-    // Check if event exists
     const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ message: "Event not found" });
-    }
+    if (!event) return res.status(404).json({ message: "Event not found" });
 
-    // Check if user has already booked the event
     const existingBooking = await Booking.findOne({
       user: userId,
       event: eventId,
     });
-    if (existingBooking) {
-      return res
-        .status(400)
-        .json({ message: "You have already booked this event" });
-    }
+    if (existingBooking)
+      return res.status(400).json({ message: "Already booked" });
 
-    // Create booking
     const booking = new Booking({ user: userId, event: eventId });
     await booking.save();
+
+    const io = req.app.get("io");
+    io.emit("newBooking", { message: `New booking for event: ${event.title}` });
 
     res.status(201).json({ message: "Event booked successfully", booking });
   } catch (error) {
@@ -41,17 +36,15 @@ exports.cancelBooking = async (req, res) => {
   try {
     const { eventId } = req.params;
     const userId = req.user.id;
-
+    console.log(eventId);
     // Find and delete booking
     const booking = await Booking.findOneAndDelete({
       user: userId,
       event: eventId,
     });
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
-
-    res.json({ message: "Booking canceled successfully" });
+    const io = req.app.get("io");
+    io.emit("newBooking", { message: `New cancel events` });
+    res.status(200).json({ message: "Event deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }
